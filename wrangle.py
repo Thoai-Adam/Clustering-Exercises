@@ -1,6 +1,4 @@
-from env import get_connection
-
-
+import env
 import os
 import numpy as np
 import pandas as pd
@@ -8,15 +6,12 @@ from zillow_query import query as zquery
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 
-
-
-    
-    
 def get_url(
             schema,
-            user="somerville_2272", 
-            host="data.codeup.com", 
-            password="eGgbCb67lYBjLZspz7Tlm076EF0POa5q"):
+            user=env.user, 
+            host=env.host, 
+            password=env.password
+):
     '''
     get_url will build a connection url to a specified schema
     under the crentials of the env.py
@@ -26,7 +21,7 @@ def get_url(
     
     return: a connection url string
     '''
-    return f'mysql+pymysql://{user}:{password}@{host}/{db}'
+    return f'mysql+pymysql://{user}:{password}@{host}/{schema}'
 
 def acquire_mall() -> pd.DataFrame:
     '''
@@ -51,64 +46,23 @@ def acquire_mall() -> pd.DataFrame:
         df.to_csv('mall_data.csv', index=False)
     return df
 
-def acquire_zillow():
+def acquire_zillow() -> pd.DataFrame:
+    '''
+    acquire_zillow will use a local env.py
+    using pre-set credentials called user, password, and host
+    please make sure you have a properly formatted env.py
+    file in the same directory as this module
+    and that you have the access rights to mall_customers schema
     
-    filename = 'zillow.csv'
-    
-    if os.path.isfile(filename):
-        
-        return pd.read_csv(filename)
-    
+    return: a single pandas dataframe
+    '''
+    if os.path.exists('zillow_data.csv'):
+        df = pd.read_csv('zillow_data.csv')
     else:
-        
-        url = get_connection('zillow')
-        
-        query = '''
-                -- here, I want to ensure that I am selecting
-                -- properties that have a transaction in 2017,
-                -- the most recent version of those properties
-                -- from there, I want to get the logerror for the zestimate
-                -- and any potential supplementary information 
-                -- available in the other tables
-                -- SELECT: everything from properties aliased as prop
-                SELECT prop.*,
-                -- predictions_2017 : logerror and transactiondate
-                predictions_2017.logerror,
-                predictions_2017.transactiondate,
-                -- all the other supplementary stuff
-                air.airconditioningdesc,
-                arch.architecturalstyledesc,
-                build.buildingclassdesc,
-                heat.heatingorsystemdesc,
-                land.propertylandusedesc,
-                story.storydesc,
-                type.typeconstructiondesc
-                FROM properties_2017 prop
-                JOIN (
-                    SELECT parcelid, MAX(transactiondate) AS max_transactiondate
-                    FROM predictions_2017
-                    GROUP BY parcelid
-                    ) pred USING(parcelid)
-                JOIN predictions_2017 ON pred.parcelid = predictions_2017.parcelid
-                                  AND pred.max_transactiondate = predictions_2017.transactiondate
-                LEFT JOIN airconditioningtype air USING(airconditioningtypeid)
-                LEFT JOIN architecturalstyletype arch USING(architecturalstyletypeid)
-                LEFT JOIN buildingclasstype build USING(buildingclasstypeid)
-                LEFT JOIN heatingorsystemtype heat USING(heatingorsystemtypeid)
-                LEFT JOIN propertylandusetype land USING(propertylandusetypeid)
-                LEFT JOIN storytype story USING(storytypeid)
-                LEFT JOIN typeconstructiontype type USING(typeconstructiontypeid)
-                WHERE propertylandusedesc = "Single Family Residential"
-                    AND transactiondate <= '2017-12-31'
-                    AND prop.longitude IS NOT NULL
-                    AND prop.latitude IS NOT NULL
-                '''
-        
-        df = pd.read_sql(query, url)
-        
-        df.to_csv(filename, index = 0)
-        
-        return df
+        url = get_url('zillow')
+        df = pd.read_sql(zquery, url)
+        df.to_csv('zillow_data.csv', index=False)
+    return df
 
 def missing_by_col(df): 
     '''
@@ -245,7 +199,7 @@ def prep_mall(df) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame):
     return: a single, cleaned dataset.
     '''
     # set the index to customer_id
-    df = df.set_index('customer_id')
+    df = df.set_index('id')
     #no missing info in this one,
     #only a couple outliers with no indication to drop them
     train, validate, test = split_data(df)
@@ -279,7 +233,7 @@ def handle_missing_values(df,
     Utilizing an input proportion for the column and rows of DataFrame df,
     drop the missing values per the axis contingent on the amount of data present.
     '''
-    prop_missing_col = 1 - prop_required_col 
+    prop_missing_col = 1 - prop_required_column
     # multiply the axis with with the appropriate ratio
     # this will return the number of rows that we want to reference
     # for our dropna function
