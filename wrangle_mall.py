@@ -2,13 +2,12 @@ import env
 import os
 import numpy as np
 import pandas as pd
-from zillow_query import query as zquery
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 
 def get_url(
             schema,
-            user=env.user, 
+            user=env.username, 
             host=env.host, 
             password=env.password
 ):
@@ -241,25 +240,4 @@ def wrangle_mall(summarization=True, k=1.5) -> (pd.DataFrame, pd.DataFrame, pd.D
     if summarization:
         summarize(acquire_mall(), k=k)
     train, validate, test = prep_mall(acquire_mall())
-    return train, validate, test
-
-def wrangle_zillow(summarization=True,
-                   k=1.5,
-                   prop_required_column=0.75,
-                   prop_required_row=0.75) -> (pd.DataFrame, pd.DataFrame, pd.DataFrame):
-    '''
-    wrangle_zillow will acquire and prepare zillow data
-    
-    if summarization is set to True, a console report 
-    of data summary will be output to the console.
-    
-    return: train, validate, and test data sets with scaled numeric information
-    '''
-    if summarization:
-        summarize(acquire_zillow(), k=k)
-    train, validate, test = prep_zillow(
-        acquire_zillow(),
-        prop_required_column=prop_required_column,
-        prop_required_row=prop_required_row
-    )
     return train, validate, test
